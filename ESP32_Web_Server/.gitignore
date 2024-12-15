@@ -1,0 +1,42 @@
+# Compiled object files, binaries, and temporary files
+*.o
+*.elf
+*.bin
+*.hex
+*.eep
+*.d
+*.map
+
+# Sketch build output (automatically generated)
+*.ino.cpp
+
+# Temporary files created during compilation
+*.tmp
+
+# Build directories
+/build/
+
+# SPIFFS or LittleFS data upload folder
+/data/
+
+# Libraries (if added locally)
+libraries/*
+
+# MacOS specific files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows specific files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs
+*.log
+
+# Hidden system files
+*.swp
+*.swo
+*.bak
