@@ -1,11 +1,17 @@
+const char stats_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML>
 <html>
 <head>
   <title>DigiCo ESP32 - {{PAGE}}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css">
-  <style>{{CSS_PLACEHOLDER}}</style>
-</head>
+  <!-- <style>{{CSS_PLACEHOLDER}}</style> -->
+  <!-- External Stylesheet -->
+  <link rel="stylesheet" href="https://raw.githubusercontent.com/cryptoteatime/digicoesp32-assets/main/ESP32_Web_Server/data/assets/dc_styles.css">
+  <!-- Favicon -->
+  <link rel="icon" type="image/x-icon" href="https://raw.githubusercontent.com/cryptoteatime/digicoesp32-assets/main/ESP32_Web_Server/data/assets/images/favicon.ico">
+  <script src="https://raw.githubusercontent.com/cryptoteatime/digicoesp32-assets/main/ESP32_Web_Server/data/assets/dc_scripts.js" defer></script>
+  </head>
 <body class="stats-page">
   <h1 class="dc-page-title">{{PAGE_HEADER}}</h1>
   <nav class="dc-header-nav">
@@ -24,7 +30,7 @@
     <b>WiFi Strength:</b> 
     <span id="dc-stats-wifi">{{WIFI}}</span> (<span id="dc-stats-wifi-quality">{{WIFI_QUALITY}}</span>)
   </p>
-  <script>{{JS_PLACEHOLDER}}</script>
+  <!-- <script>{{JS_PLACEHOLDER}}</script> -->
   <script>
     DCautoUpdate("stats", "{{GENERATED_TOKEN}}", (token, callback) => {
       DCfetchData("/api/data", token, "stats", (data, newToken) => {
@@ -40,3 +46,4 @@
   </script>
 </body>
 </html>
+)rawliteral";

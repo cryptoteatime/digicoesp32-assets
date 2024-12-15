@@ -1,10 +1,16 @@
+const char settings_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html>
 <head>
   <title>DigiCo ESP32 - {{PAGE}}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css">
-  <style>{{CSS_PLACEHOLDER}}</style>
+  <!-- <style>{{CSS_PLACEHOLDER}}</style> -->
+  <!-- External Stylesheet -->
+  <link rel="stylesheet" href="https://raw.githubusercontent.com/cryptoteatime/digicoesp32-assets/main/ESP32_Web_Server/data/assets/dc_styles.css">
+  <!-- Favicon -->
+  <link rel="icon" type="image/x-icon" href="https://raw.githubusercontent.com/cryptoteatime/digicoesp32-assets/main/ESP32_Web_Server/data/assets/images/favicon.ico">
+  <script src="https://raw.githubusercontent.com/cryptoteatime/digicoesp32-assets/main/ESP32_Web_Server/data/assets/dc_scripts.js" defer></script>
 </head>
 <body class="settings-page">
   <h1 class="dc-page-title">{{PAGE_HEADER}}</h1>
@@ -24,17 +30,13 @@
     <input type="submit" value="Save">
   </form>
   <h3>Sensor Settings</h3>
-  <h2>Dynamic Updates Upload</h2>
-  <form method="POST" action="/upload" enctype="multipart/form-data">
-    <input type="file" name="file">
-    <input type="hidden" name="upload_token" id="dc-upload-token" value="[GENERATED_TOKEN]"><br>
-    <input type="submit" value="Upload">
-  </form>
 
-  <script>{{JS_PLACEHOLDER}}</script>
+  <!-- <script>{{JS_PLACEHOLDER}}</script> -->
+  <script src="https://raw.githubusercontent.com/cryptoteatime/digicoesp32-assets/main/ESP32_Web_Server/data/assets/dc_scripts.js"></script>
   <script>
     // Start auto-updates for homepage
-    autoUpdate('homepage', '{{GENERATED_TOKEN}}', updateHomepage, 5000);
+    // autoUpdate('settings', '{{GENERATED_TOKEN}}', updateSettings, 5000);
   </script>
 </body>
 </html>
+)rawliteral";

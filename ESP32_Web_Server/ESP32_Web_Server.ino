@@ -12,12 +12,9 @@
 #include <Base64.h>                         // Base64 Generate Tokens
 #include <map>                              // Token management
 // Import User Assets
-#include "data/assets/images/favicon.h"     // Added Favicon Support
 #include "data/html/dc_index.h"             // Public: Homepage HTML
 #include "data/html/dc_stats.h"             // Public: Server Stats HTML
 #include "data/html/dc_settings.h"          // Private: Settings HTML
-#include "data/assets/dc_styles.h"          // Global Styles Sheet
-#include "data/assets/dc_scripts.h"         // Global Scripts Sheet
 
 std::map<String, String> currentTokens; // Map to store tokens for each location
 
@@ -146,12 +143,6 @@ void setup() {
   Serial.println("Connected. IP address: " + WiFi.localIP().toString());
 
   //####### Web Server Routes #######//
-
-  //Public: Favicon
-  server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(200, "image/x-icon", favicon_ico, favicon_ico_len);
-  });
-
   // Public: Homepage
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     String token = generateTokenForLoc("homepage"); // Generate token for homepage
@@ -159,9 +150,9 @@ void setup() {
 
     // Replace placeholders with initial data
     html.replace("{{PAGE}}", "Home");
-    html.replace("{{CSS_PLACEHOLDER}}", styles_css);
+    //html.replace("{{CSS_PLACEHOLDER}}", styles_css);
     html.replace("{{PAGE_HEADER}}", "DigiCo Web Server");
-    html.replace("{{JS_PLACEHOLDER}}", script_js);
+    //html.replace("{{JS_PLACEHOLDER}}", script_js);
     html.replace("{{GENERATED_TOKEN}}", token); // Embed the generated token
     html.replace("{{TEMPERATURE}}", String(currentTemperature, 1));
     html.replace("{{HUMIDITY}}", String(currentHumidity, 1));
@@ -171,20 +162,20 @@ void setup() {
 
   // Public: Server Stats Page
   server.on("/stats", HTTP_GET, [](AsyncWebServerRequest *request) {
-      String token = generateTokenForLoc("stats"); // Generate token for stats page
-      String html(stats_html);
+    String token = generateTokenForLoc("stats"); // Generate token for stats page
+    String html(stats_html);
 
-      // Replace placeholders with initial stats
-      html.replace("{{PAGE}}", "Stats");
-      html.replace("{{CSS_PLACEHOLDER}}", styles_css);
-      html.replace("{{PAGE_HEADER}}", "Server Stats");
-      html.replace("{{JS_PLACEHOLDER}}", script_js);
-      html.replace("{{GENERATED_TOKEN}}", token); // Embed the generated token
-      html.replace("{{UPTIME}}", String(millis() / 1000));
-      html.replace("{{HEAP}}", String(ESP.getFreeHeap()));
-      html.replace("{{WIFI}}", String(WiFi.RSSI()));
+    // Replace placeholders with initial stats
+    html.replace("{{PAGE}}", "Stats");
+    //html.replace("{{CSS_PLACEHOLDER}}", styles_css);
+    html.replace("{{PAGE_HEADER}}", "Server Stats");
+    //html.replace("{{JS_PLACEHOLDER}}", script_js);
+    html.replace("{{GENERATED_TOKEN}}", token); // Embed the generated token
+    html.replace("{{UPTIME}}", String(millis() / 1000));
+    html.replace("{{HEAP}}", String(ESP.getFreeHeap()));
+    html.replace("{{WIFI}}", String(WiFi.RSSI()));
 
-      request->send(200, "text/html", html);
+    request->send(200, "text/html", html);
   });
 
   // Private: Server Settings Page
@@ -192,7 +183,17 @@ void setup() {
     if (!request->authenticate("admin", "password")) {
       return request->requestAuthentication();
     }
-    request->send(200, "text/html", settings_html);
+    String token = generateTokenForLoc("settings");
+    String html(stats_html);
+
+    // Replace placeholders with initial stats
+    html.replace("{{PAGE}}", "Settings");
+    //html.replace("{{CSS_PLACEHOLDER}}", styles_css);
+    html.replace("{{PAGE_HEADER}}", "Server Settings");
+    //html.replace("{{JS_PLACEHOLDER}}", script_js);
+    html.replace("{{GENERATED_TOKEN}}", token); // Embed the generated token
+
+    request->send(200, "text/html", html);
   });
 
   // API Endpoint for AJAX calls
