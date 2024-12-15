@@ -17,7 +17,10 @@
 /build/
 
 # SPIFFS or LittleFS data upload folder
-/data/
+# /data/
+
+# Remove whatever this is
+.theia/
 
 # Libraries (if added locally)
 libraries/*
