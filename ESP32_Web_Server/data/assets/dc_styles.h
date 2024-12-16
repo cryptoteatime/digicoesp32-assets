@@ -1,3 +1,4 @@
+const char styles_css[] PROGMEM = R"rawliteral(
 /* Global Styles */
 html { font-family: Arial, sans-serif; text-align: center; margin: auto; }
 h1 { font-size: 2.5rem; margin-bottom: 1rem; }
@@ -13,3 +14,4 @@ nav a:hover { text-decoration: underline; }
 
 /* Settings Page Styles */
 #dc-settings-form input { margin: 0.5rem 0; display: block; }
+)rawliteral";

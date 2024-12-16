@@ -7,17 +7,51 @@
 #include <Adafruit_SSD1306.h>               // OLED library
 #include <Wire.h>                           // I2C communication
 #include <ESPmDNS.h>                        // mDNS
-//#include <ArduinoOTA.h>                     // Over-the-Air updates
 #include <Arduino.h>                        // Not sure what this is for
 #include <Base64.h>                         // Base64 Generate Tokens
 #include <map>                              // Token management
+#include <Preferences.h>
+
+// Map to store tokens for each location
+std::map<String, String> currentTokens; 
+// Preferences to save WIFI creds and settings. 
+Preferences preferences;
+// Web Server Config
+AsyncWebServer server(80);
+// Replace with your network credentials
+const char* ssid = "NETGEAR46";
+const char* password = "kindsea989";
+
+// DHT Sensor Configuration
+#define DHTPIN 4
+#define DHTTYPE DHT11
+DHT dht(DHTPIN, DHTTYPE);
+
+// OLED Configuration
+#define SCREEN_HEIGHT 64
+#define SCREEN_WIDTH 128
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+// Default Access Point credentials
+const char* apSSID = "ESP32_Config";
+const char* apPassword = "12345678";
+
+// Global variables for sensor data
+float currentTemperature = NAN;
+float currentHumidity = NAN;
+unsigned long lastSensorUpdate = 0;
+const unsigned long sensorUpdateInterval = 5000; // 5 seconds
+
 // Import User Assets
+#include "data/assets/images/favicon.h"
 #include "data/html/dc_index.h"             // Public: Homepage HTML
 #include "data/html/dc_stats.h"             // Public: Server Stats HTML
 #include "data/html/dc_settings.h"          // Private: Settings HTML
+#include "data/assets/dc_styles.h"
+#include "data/assets/dc_scripts.h"
 
-std::map<String, String> currentTokens; // Map to store tokens for each location
 
+/* Functions */
 String generateToken() {
   uint8_t randomBytes[16];
   for (int i = 0; i < 16; i++) {
@@ -74,55 +108,86 @@ String classifyWiFiSignal(int rssi) {
   return "Poor";
 }
 
+void saveWiFiCredentials(const String& ssid, const String& password) {
+  preferences.begin("WiFiCreds", false);
+  preferences.putString("ssid", ssid);
+  preferences.putString("password", password);
+  preferences.end();
+}
 
-// Replace with your network credentials
-const char* ssid = "NETGEAR46";
-const char* password = "kindsea989";
+String loadWiFiSSID() {
+  preferences.begin("WiFiCreds", true);
+  String ssid = preferences.getString("ssid", "");
+  preferences.end();
+  return ssid;
+}
 
-// DHT Sensor Configuration
-#define DHTPIN 4
-#define DHTTYPE DHT11
-DHT dht(DHTPIN, DHTTYPE);
+String loadWiFiPassword() {
+  preferences.begin("WiFiCreds", true);
+  String password = preferences.getString("password", "");
+  preferences.end();
+  return password;
+}
 
-// OLED Configuration
-#define SCREEN_HEIGHT 64
-#define SCREEN_WIDTH 128
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+void updateOLED(float temperature, float humidity) {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  display.setCursor(0, 10);
+  display.printf("Temp: %.1f°F\nHum: %.1f%%", temperature, humidity);
+  display.display();
+}
 
-// Web Server Configuration
-AsyncWebServer server(80);
+void readAndUpdateSensorData() {
+  currentTemperature = dht.readTemperature(true);
+  currentHumidity = dht.readHumidity();
 
-// Global variables for sensor data
-float currentTemperature = NAN;
-float currentHumidity = NAN;
-unsigned long lastSensorUpdate = 0;
-const unsigned long sensorUpdateInterval = 5000; // 5 seconds
+  if (isnan(currentTemperature) || isnan(currentHumidity)) {
+    Serial.println("Failed to read from DHT sensor!");
+  } else {
+    Serial.printf("Temperature: %.1f°F\nHumidity: %.1f%%\n", currentTemperature, currentHumidity);
+    updateOLED(currentTemperature, currentHumidity);
+  }
+}
+
+bool connectToWiFi(const char* ssid, const char* password) {
+  Serial.printf("Attempting to connect to Wi-Fi: %s\n", ssid);
+  WiFi.begin(ssid, password);
+
+  unsigned long startAttemptTime = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < 15000) {
+    delay(1000);
+    Serial.print(".");
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\nConnected to Wi-Fi!");
+    Serial.print("IP Address: ");
+    Serial.println(WiFi.localIP());
+    return true;
+  } else {
+    Serial.println("\nFailed to connect to Wi-Fi.");
+    return false;
+  }
+}
+
+void startAccessPoint() {
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(apSSID, apPassword);
+
+  Serial.println("Access Point started");
+  Serial.print("AP IP Address: ");
+  Serial.println(WiFi.softAPIP());
+  server.begin();
+}
+
 
 //* Main Setup Function *//
 void setup() {
-
-  // Serial Debugging
   Serial.begin(115200);
 
-  /*
-  // Setup Over-the-Air Updates
-  ArduinoOTA.onStart([]() {
-    String type = (ArduinoOTA.getCommand() == U_FLASH) ? "sketch" : "filesystem";
-    Serial.println("Start updating " + type);
-  });
-  ArduinoOTA.onEnd([]() {
-    Serial.println("\nUpdate End");
-  });
-  ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-    else if (error == OTA_END_ERROR) Serial.println("End Failed");
-  });
-  ArduinoOTA.begin();
-  */
+  // Initialize Preferences
+  preferences.begin("WiFiCreds", false);
 
   // Initialize DHT Sensor
   dht.begin();
@@ -134,15 +199,32 @@ void setup() {
   }
   display.clearDisplay();
 
-  // Connect to Wi-Fi
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(1000);
-    Serial.println("Connecting to Wi-Fi...");
+  // Start Sensor Updates Immediately
+  readAndUpdateSensorData();
+
+  // Connect to Wi-Fi or Start AP Mode
+  String savedSSID = loadWiFiSSID();
+  String savedPassword = loadWiFiPassword();
+
+  if (!savedSSID.isEmpty() && !savedPassword.isEmpty()) {
+    if (connectToWiFi(savedSSID.c_str(), savedPassword.c_str())) {
+      Serial.println("Connected to saved Wi-Fi credentials.");
+    } else {
+      Serial.println("Failed to connect to saved Wi-Fi. Starting Access Point...");
+      startAccessPoint();
+    }
+  } else {
+    Serial.println("No Wi-Fi credentials found. Starting Access Point...");
+    startAccessPoint();
   }
-  Serial.println("Connected. IP address: " + WiFi.localIP().toString());
 
   //####### Web Server Routes #######//
+  // PUBLIC: Favicon
+  server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "image/x-icon", favicon_ico, favicon_ico_len);
+  });
+
+
   // Public: Homepage
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     String token = generateTokenForLoc("homepage"); // Generate token for homepage
@@ -150,9 +232,9 @@ void setup() {
 
     // Replace placeholders with initial data
     html.replace("{{PAGE}}", "Home");
-    //html.replace("{{CSS_PLACEHOLDER}}", styles_css);
+    html.replace("{{CSS_PLACEHOLDER}}", styles_css);
     html.replace("{{PAGE_HEADER}}", "DigiCo Web Server");
-    //html.replace("{{JS_PLACEHOLDER}}", script_js);
+    html.replace("{{JS_PLACEHOLDER}}", script_js);
     html.replace("{{GENERATED_TOKEN}}", token); // Embed the generated token
     html.replace("{{TEMPERATURE}}", String(currentTemperature, 1));
     html.replace("{{HUMIDITY}}", String(currentHumidity, 1));
@@ -167,9 +249,9 @@ void setup() {
 
     // Replace placeholders with initial stats
     html.replace("{{PAGE}}", "Stats");
-    //html.replace("{{CSS_PLACEHOLDER}}", styles_css);
+    html.replace("{{CSS_PLACEHOLDER}}", styles_css);
     html.replace("{{PAGE_HEADER}}", "Server Stats");
-    //html.replace("{{JS_PLACEHOLDER}}", script_js);
+    html.replace("{{JS_PLACEHOLDER}}", script_js);
     html.replace("{{GENERATED_TOKEN}}", token); // Embed the generated token
     html.replace("{{UPTIME}}", String(millis() / 1000));
     html.replace("{{HEAP}}", String(ESP.getFreeHeap()));
@@ -184,17 +266,46 @@ void setup() {
       return request->requestAuthentication();
     }
     String token = generateTokenForLoc("settings");
-    String html(stats_html);
+    String html(settings_html);
 
     // Replace placeholders with initial stats
     html.replace("{{PAGE}}", "Settings");
-    //html.replace("{{CSS_PLACEHOLDER}}", styles_css);
+    html.replace("{{CSS_PLACEHOLDER}}", styles_css);
     html.replace("{{PAGE_HEADER}}", "Server Settings");
-    //html.replace("{{JS_PLACEHOLDER}}", script_js);
     html.replace("{{GENERATED_TOKEN}}", token); // Embed the generated token
+    html.replace("{{CONNECTION_STATUS}}", WiFi.status() == WL_CONNECTED ? "Connected to Wi-Fi" : "Running in Access Point Mode");
+
 
     request->send(200, "text/html", html);
   });
+
+  server.on("/settings", HTTP_POST, [](AsyncWebServerRequest *request) {
+      // Ensure required parameters exist
+      if (!request->hasParam("ssid", true) || !request->hasParam("password", true) || !request->hasParam("token", true)) {
+          request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Missing SSID, Password, or Token\"}");
+          return;
+      }
+
+      String ssid = request->getParam("ssid", true)->value();
+      String password = request->getParam("password", true)->value();
+      String receivedToken = request->getParam("token", true)->value();
+
+      // Validate token for 'settings' location
+      if (!validateToken("settings", receivedToken)) {
+          request->send(403, "application/json", "{\"status\":\"error\",\"message\":\"Invalid or expired token\"}");
+          return;
+      }
+
+      // Save Wi-Fi credentials
+      saveWiFiCredentials(ssid, password);
+
+      // Respond with success and prepare for restart
+      request->send(200, "application/json", "{\"status\":\"success\",\"message\":\"Credentials saved! Rebooting...\"}");
+      delay(2000);
+      ESP.restart();
+  });
+
+
 
   // API Endpoint for AJAX calls
   // Frontend Data Call
@@ -239,26 +350,31 @@ void setup() {
     request->send(200, "application/json", json);
   });
 
+  // Test Wifi Details AJAX Call
+  server.on("/api/testwifi", HTTP_POST, [](AsyncWebServerRequest *request) {
+      if (!request->hasParam("ssid", true) || !request->hasParam("password", true)) {
+          request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Missing SSID or Password\"}");
+          return;
+      }
 
-  // Protected: Backend Update AJAX Call
-  /*
-  server.on("/api/update", HTTP_POST, [](AsyncWebServerRequest *request) {
-    const String authToken = "my_secure_token";
-    if (!request->hasParam("update_token") || request->getParam("update_token")->value() != authToken) {
-      request->send(403, "text/plain", "Forbidden");
-      return;
-    }
-    if (request->hasParam("wifi_ssid", true) && request->hasParam("wifi_password", true)) {
-      String ssid = request->getParam("wifi_ssid", true)->value();
-      String password = request->getParam("wifi_password", true)->value();
-      Serial.println("New SSID: " + ssid);
-      Serial.println("New Password: " + password);
-      request->send(200, "text/html", "Settings updated!");
-    } else {
-      request->send(400, "text/html", "Missing parameters.");
-    }
+      String ssid = request->getParam("ssid", true)->value();
+      String password = request->getParam("password", true)->value();
+
+      WiFi.begin(ssid.c_str(), password.c_str());
+      unsigned long startAttemptTime = millis();
+
+      while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < 15000) {
+          delay(500);  // Check connection for up to 15 seconds
+      }
+
+      if (WiFi.status() == WL_CONNECTED) {
+          request->send(200, "application/json", "{\"status\":\"success\",\"message\":\"Wi-Fi Connected Successfully!\"}");
+      } else {
+          request->send(200, "application/json", "{\"status\":\"error\",\"message\":\"Failed to connect to Wi-Fi. Please try again.\"}");
+      }
+      WiFi.disconnect();  // Disconnect to ensure proper reboot handling later
   });
-  */
+
 
 
   // Start Web Server
@@ -273,28 +389,10 @@ void setup() {
 }
 
 void loop() {
-  // Update sensor data and OLED every interval
+  // Periodically Update Sensor Data and OLED
   unsigned long currentMillis = millis();
   if (currentMillis - lastSensorUpdate >= sensorUpdateInterval) {
     lastSensorUpdate = currentMillis;
-
-    // Read sensor data
-    currentTemperature = dht.readTemperature(true);
-    currentHumidity = dht.readHumidity();
-
-    if (isnan(currentTemperature) || isnan(currentHumidity)) {
-      Serial.println("Failed to read from DHT sensor!");
-    } else {
-      Serial.printf("Temperature: %.1f°F\nHumidity: %.1f%%\n", currentTemperature, currentHumidity);
-
-      // Update OLED display
-      display.clearDisplay();
-      display.setTextSize(1);
-      display.setTextColor(WHITE);
-      display.setCursor(0, 10);
-      display.printf("Temp: %.1f°F\nHum: %.1f%%", currentTemperature, currentHumidity);
-      display.display();
-    }
+    readAndUpdateSensorData();
   }
-  //ArduinoOTA.handle();
 }
